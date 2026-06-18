@@ -35,6 +35,18 @@
     background-repeat:no-repeat;background-position:right 14px center;padding-right:34px;
   }
   select:focus{outline:none;border-color:var(--rose)}
+  /* searchable campaign combobox */
+  .combo{position:relative;flex:1;min-width:200px}
+  .combo-input{width:100%;font:inherit;font-size:15px;padding:11px 34px 11px 13px;border-radius:12px;border:1.5px solid var(--line);background:#fff;color:var(--ink)}
+  .combo-input:focus{outline:none;border-color:var(--rose)}
+  .combo-caret{position:absolute;right:13px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--rose-d);font-size:10px}
+  .combo-list{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;background:#fff;border:1.5px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(200,49,111,.18);max-height:280px;overflow-y:auto;padding:5px}
+  .combo-list[hidden]{display:none}
+  .combo-item{padding:9px 11px;border-radius:9px;cursor:pointer;font-size:14.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .combo-item .cnt{color:var(--muted);font-size:12.5px}
+  .combo-item:hover,.combo-item.active{background:var(--chip)}
+  .combo-item.sel{color:var(--rose-d);font-weight:700}
+  .combo-empty{padding:10px 11px;color:var(--muted);font-size:13.5px}
   .seg{display:inline-flex;background:var(--chip);border-radius:11px;padding:3px;gap:2px;flex-wrap:wrap}
   .seg button{
     font:inherit;font-size:13.5px;font-weight:600;border:0;background:transparent;color:var(--muted);
@@ -98,8 +110,12 @@
 
   <div class="card controls">
     <div class="ctl-row">
-      <label class="lbl" for="campaign">แคมเปญ</label>
-      <select id="campaign"></select>
+      <label class="lbl" for="campaignInput">แคมเปญ</label>
+      <div class="combo" id="combo">
+        <input id="campaignInput" class="combo-input" type="text" autocomplete="off" spellcheck="false" placeholder="พิมพ์ชื่อแคมเปญเพื่อค้นหา… เช่น Moschino, Ferrari">
+        <span class="combo-caret">▼</span>
+        <div id="campaignList" class="combo-list" hidden></div>
+      </div>
     </div>
     <div class="ctl-row">
       <label class="lbl">ภาษา</label>
@@ -149,7 +165,8 @@
 (function(){
   "use strict";
   var DATA = window.KNP_DATA;
-  var elCampaign=document.getElementById('campaign');
+  var elCampInput=document.getElementById('campaignInput');
+  var elCampList=document.getElementById('campaignList');
   var elPool=document.getElementById('pool');
   var elSub=document.getElementById('subline');
   var elText=document.getElementById('ctext');
@@ -166,31 +183,28 @@
   var fmt=function(n){return n.toLocaleString('en-US');};
   elSub.innerHTML='สุ่มคอมเมนต์ซัพพอร์ตเก่งน้ำปิง · รวม <b>'+fmt(DATA.total)+'</b> คอมเมนต์ จาก <b>'+DATA.campaigns.length+'</b> แคมเปญ';
 
-  // ----- build campaign dropdown -----
-  var optAll=document.createElement('option');
-  optAll.value='__all__'; optAll.textContent='⭐ ทุกแคมเปญรวมกัน ('+fmt(DATA.total)+')';
-  elCampaign.appendChild(optAll);
-  DATA.campaigns.forEach(function(c,i){
-    var o=document.createElement('option');
-    o.value=String(i); o.textContent=c.name+' ('+fmt(c.count)+')';
-    elCampaign.appendChild(o);
-  });
+  // ----- campaign options (searchable combobox) -----
+  var campOptions=[{v:'__all__',name:'⭐ ทุกแคมเปญรวมกัน',count:DATA.total}];
+  DATA.campaigns.forEach(function(c,i){ campOptions.push({v:String(i),name:c.name,count:c.count}); });
 
   // ----- state -----
   var lang='all', tag='all';
+  var campSel='__all__';   // selected campaign value
+  var campActive=-1;       // highlighted index in visible list
+  var campView=[];         // currently visible options
   var pool=[];            // current filtered array of items
   var recent=[];          // recently shown texts (avoid repeats)
   var current=null;
 
   function rebuildPool(){
     var src;
-    if(elCampaign.value==='__all__'){
+    if(campSel==='__all__'){
       src=[];
       DATA.campaigns.forEach(function(c){
         for(var k=0;k<c.items.length;k++){var it=c.items[k];it.__c=c.name;src.push(it);}
       });
     }else{
-      var c=DATA.campaigns[+elCampaign.value];
+      var c=DATA.campaigns[+campSel];
       src=c.items;
       for(var k=0;k<src.length;k++){src[k].__c=c.name;}
     }
@@ -279,8 +293,43 @@
     copyText(current.t); toast(); pushHistory(current);
   }
 
+  // ----- campaign combobox -----
+  function labelOf(v){for(var i=0;i<campOptions.length;i++){if(campOptions[i].v===v)return campOptions[i].name;}return '';}
+  function renderCampList(filter){
+    filter=(filter||'').trim().toLowerCase();
+    campView=filter?campOptions.filter(function(o){return o.name.toLowerCase().indexOf(filter)!==-1;}):campOptions.slice();
+    elCampList.innerHTML='';
+    if(campView.length===0){var e=document.createElement('div');e.className='combo-empty';e.textContent='ไม่พบแคมเปญที่ค้นหา';elCampList.appendChild(e);return;}
+    campView.forEach(function(o,i){
+      var d=document.createElement('div');
+      d.className='combo-item'+(o.v===campSel?' sel':'')+(i===campActive?' active':'');
+      var cnt=document.createElement('span');cnt.className='cnt';cnt.textContent=' ('+fmt(o.count)+')';
+      d.appendChild(document.createTextNode(o.name));d.appendChild(cnt);
+      d.addEventListener('mousedown',function(ev){ev.preventDefault();chooseCamp(o.v);});
+      d.addEventListener('mouseenter',function(){campActive=i;syncActive();});
+      elCampList.appendChild(d);
+    });
+  }
+  function syncActive(){
+    var items=elCampList.querySelectorAll('.combo-item');
+    for(var i=0;i<items.length;i++){items[i].classList.toggle('active',i===campActive);}
+    if(campActive>=0&&items[campActive])items[campActive].scrollIntoView({block:'nearest'});
+  }
+  function openCamp(){campActive=-1;renderCampList('');elCampList.hidden=false;}
+  function closeCamp(){elCampList.hidden=true;elCampInput.value=labelOf(campSel);}
+  function chooseCamp(v){campSel=v;elCampList.hidden=true;elCampInput.value=labelOf(v);elCampInput.blur();rebuildPool();pick();}
+
   // ----- events -----
-  elCampaign.addEventListener('change',function(){rebuildPool();pick();});
+  elCampInput.addEventListener('focus',function(){this.select();openCamp();});
+  elCampInput.addEventListener('input',function(){renderCampList(this.value);campActive=campView.length?0:-1;syncActive();elCampList.hidden=false;});
+  elCampInput.addEventListener('keydown',function(e){
+    if(elCampList.hidden&&(e.key==='ArrowDown'||e.key==='ArrowUp')){openCamp();return;}
+    if(e.key==='ArrowDown'){e.preventDefault();if(campView.length){campActive=(campActive+1)%campView.length;syncActive();}}
+    else if(e.key==='ArrowUp'){e.preventDefault();if(campView.length){campActive=(campActive-1+campView.length)%campView.length;syncActive();}}
+    else if(e.key==='Enter'){e.preventDefault();if(campActive>=0&&campView[campActive])chooseCamp(campView[campActive].v);else if(campView.length===1)chooseCamp(campView[0].v);}
+    else if(e.key==='Escape'){closeCamp();this.blur();}
+  });
+  elCampInput.addEventListener('blur',function(){setTimeout(function(){if(!elCampList.hidden)closeCamp();},150);});
   document.getElementById('langSeg').addEventListener('click',function(e){
     if(e.target.tagName!=='BUTTON')return;
     this.querySelectorAll('button').forEach(function(b){b.classList.remove('active');});
@@ -301,6 +350,7 @@
   });
 
   // ----- init -----
+  elCampInput.value=labelOf(campSel);
   rebuildPool();
   pick();
 })();
