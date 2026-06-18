@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KNP Comment Support · สุ่มคอมเมนต์</title>
+<style>
+  :root{
+    --bg1:#fff1f6; --bg2:#ffe9f2; --card:#ffffff; --ink:#3a2b33; --muted:#9a8590;
+    --rose:#e84a8a; --rose-d:#c8316f; --rose-soft:#ffd9e7; --line:#f3d6e2;
+    --ok:#2e9e6b; --chip:#fbe7f0; --shadow:0 10px 30px rgba(200,49,111,.12);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Sarabun","Leelawadee UI",Tahoma,sans-serif;
+    color:var(--ink);
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    min-height:100vh; padding:28px 16px 60px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:780px;margin:0 auto}
+  header{text-align:center;margin-bottom:22px}
+  h1{font-size:27px;margin:0 0 6px;font-weight:800;letter-spacing:-.3px}
+  h1 .dot{color:var(--rose)}
+  .sub{color:var(--muted);font-size:14px;margin:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}
+  .controls{padding:18px 18px 8px;margin-bottom:18px}
+  .ctl-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  .ctl-row label.lbl{font-size:13px;font-weight:700;color:var(--rose-d);min-width:62px}
+  select{
+    flex:1;min-width:200px;font:inherit;font-size:15px;padding:11px 13px;border-radius:12px;
+    border:1.5px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;
+    appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%23c8316f' stroke-width='2' fill='none' stroke-linecap='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 14px center;padding-right:34px;
+  }
+  select:focus{outline:none;border-color:var(--rose)}
+  .seg{display:inline-flex;background:var(--chip);border-radius:11px;padding:3px;gap:2px;flex-wrap:wrap}
+  .seg button{
+    font:inherit;font-size:13.5px;font-weight:600;border:0;background:transparent;color:var(--muted);
+    padding:7px 13px;border-radius:9px;cursor:pointer;transition:.15s;white-space:nowrap;
+  }
+  .seg button.active{background:#fff;color:var(--rose-d);box-shadow:0 1px 4px rgba(200,49,111,.18)}
+  .seg button:hover:not(.active){color:var(--rose-d)}
+  .pool{font-size:13px;color:var(--muted);text-align:right;padding:2px 2px 8px}
+  .pool b{color:var(--rose-d)}
+
+  .randombtn{
+    width:100%;font:inherit;font-size:19px;font-weight:800;color:#fff;cursor:pointer;
+    background:linear-gradient(135deg,var(--rose),var(--rose-d));border:0;border-radius:16px;
+    padding:18px;box-shadow:0 8px 22px rgba(232,74,138,.4);transition:.12s;margin-bottom:18px;
+  }
+  .randombtn:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(232,74,138,.5)}
+  .randombtn:active{transform:translateY(0) scale(.99)}
+  .randombtn .kbd{font-size:12px;font-weight:600;opacity:.85;margin-left:6px}
+
+  .result{padding:24px 22px;min-height:150px;display:flex;flex-direction:column;margin-bottom:18px}
+  .result.flash{animation:flash .35s}
+  @keyframes flash{0%{background:#fff6fa}100%{background:#fff}}
+  .meta{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:13px}
+  .tag{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--rose-soft);color:var(--rose-d)}
+  .tag.lang{background:#e6f3ff;color:#1f6fb2}
+  .tag.gray{background:#eee;color:#777}
+  .ctext{font-size:20px;line-height:1.6;font-weight:500;flex:1;white-space:pre-wrap;word-break:break-word}
+  .ctext.empty{color:var(--muted);font-weight:400;font-size:16px;display:flex;align-items:center;justify-content:center;text-align:center;min-height:80px}
+  .actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+  .btn{font:inherit;font-size:15px;font-weight:700;border-radius:12px;padding:12px 18px;cursor:pointer;border:1.5px solid var(--line);background:#fff;color:var(--rose-d);transition:.12s}
+  .btn:hover{border-color:var(--rose);background:#fff6fa}
+  .btn.primary{background:var(--rose-d);color:#fff;border-color:var(--rose-d);flex:1;min-width:140px}
+  .btn.primary:hover{background:var(--rose)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+
+  .history{padding:16px 20px 20px}
+  .history h2{font-size:14px;color:var(--rose-d);margin:0 0 10px;font-weight:800}
+  .hist-empty{color:var(--muted);font-size:13px}
+  .hist-item{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px dashed var(--line);font-size:14px;line-height:1.45}
+  .hist-item:first-of-type{border-top:0}
+  .hist-item .hx{flex:1;color:#5a4a52;word-break:break-word}
+  .hist-item button{font:inherit;font-size:12px;font-weight:700;color:var(--rose-d);background:var(--chip);border:0;border-radius:8px;padding:5px 10px;cursor:pointer;white-space:nowrap}
+  .hist-item button:hover{background:var(--rose-soft)}
+
+  .toast{
+    position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);
+    background:var(--ok);color:#fff;font-weight:700;font-size:15px;padding:13px 24px;border-radius:999px;
+    box-shadow:0 8px 24px rgba(46,158,107,.4);opacity:0;pointer-events:none;transition:.25s;z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  footer{text-align:center;color:var(--muted);font-size:12px;margin-top:26px;line-height:1.7}
+  @media(max-width:560px){h1{font-size:22px}.ctext{font-size:18px}.ctl-row label.lbl{min-width:auto;width:100%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🎀 KNP Comment Support</h1>
+    <p class="sub" id="subline">กำลังโหลดคอมเมนต์…</p>
+  </header>
+
+  <div class="card controls">
+    <div class="ctl-row">
+      <label class="lbl" for="campaign">แคมเปญ</label>
+      <select id="campaign"></select>
+    </div>
+    <div class="ctl-row">
+      <label class="lbl">ภาษา</label>
+      <div class="seg" id="langSeg">
+        <button data-v="all" class="active">ทั้งหมด</button>
+        <button data-v="TH">ไทย</button>
+        <button data-v="EN">ENG</button>
+      </div>
+    </div>
+    <div class="ctl-row">
+      <label class="lbl">แท็ก</label>
+      <div class="seg" id="tagSeg">
+        <button data-v="all" class="active">ทั้งหมด</button>
+        <button data-v="1">มีแท็ก @</button>
+        <button data-v="0">ไม่มีแท็ก</button>
+      </div>
+    </div>
+    <div class="pool" id="pool"></div>
+  </div>
+
+  <button class="randombtn" id="randomBtn">🎲 สุ่มคอมเมนต์ <span class="kbd">(เว้นวรรค)</span></button>
+
+  <div class="card result" id="result">
+    <div class="meta" id="meta" style="display:none"></div>
+    <div class="ctext empty" id="ctext">กดปุ่ม “สุ่มคอมเมนต์” เพื่อเริ่มได้เลย</div>
+    <div class="actions">
+      <button class="btn primary" id="copyBtn" disabled>📋 คัดลอก <span class="kbd">(C)</span></button>
+      <button class="btn" id="copyNextBtn" disabled>คัดลอก + สุ่มต่อ</button>
+    </div>
+  </div>
+
+  <div class="card history">
+    <h2>📌 คัดลอกล่าสุด</h2>
+    <div id="histList"><div class="hist-empty">ยังไม่มีรายการที่คัดลอก</div></div>
+  </div>
+
+  <footer>
+    ทำงานแบบออฟไลน์ทั้งหมด · ข้อมูลจากไฟล์ KNP commemt support<br>
+    เคล็ดลับ: กด <b>เว้นวรรค</b> เพื่อสุ่ม · กด <b>C</b> เพื่อคัดลอก
+  </footer>
+</div>
+
+<div class="toast" id="toast">คัดลอกแล้ว ✓</div>
+
+<script src="comments_data.js"></script>
+<script>
+(function(){
+  "use strict";
+  var DATA = window.KNP_DATA;
+  var elCampaign=document.getElementById('campaign');
+  var elPool=document.getElementById('pool');
+  var elSub=document.getElementById('subline');
+  var elText=document.getElementById('ctext');
+  var elMeta=document.getElementById('meta');
+  var elResult=document.getElementById('result');
+  var elCopy=document.getElementById('copyBtn');
+  var elCopyNext=document.getElementById('copyNextBtn');
+  var elRandom=document.getElementById('randomBtn');
+  var elToast=document.getElementById('toast');
+  var elHist=document.getElementById('histList');
+
+  if(!DATA||!DATA.campaigns){elSub.textContent='โหลดข้อมูลไม่สำเร็จ (หา comments_data.js ไม่เจอ)';return;}
+
+  var fmt=function(n){return n.toLocaleString('en-US');};
+  elSub.innerHTML='สุ่มคอมเมนต์ซัพพอร์ตเก่งน้ำปิง · รวม <b>'+fmt(DATA.total)+'</b> คอมเมนต์ จาก <b>'+DATA.campaigns.length+'</b> แคมเปญ';
+
+  // ----- build campaign dropdown -----
+  var optAll=document.createElement('option');
+  optAll.value='__all__'; optAll.textContent='⭐ ทุกแคมเปญรวมกัน ('+fmt(DATA.total)+')';
+  elCampaign.appendChild(optAll);
+  DATA.campaigns.forEach(function(c,i){
+    var o=document.createElement('option');
+    o.value=String(i); o.textContent=c.name+' ('+fmt(c.count)+')';
+    elCampaign.appendChild(o);
+  });
+
+  // ----- state -----
+  var lang='all', tag='all';
+  var pool=[];            // current filtered array of items
+  var recent=[];          // recently shown texts (avoid repeats)
+  var current=null;
+
+  function rebuildPool(){
+    var src;
+    if(elCampaign.value==='__all__'){
+      src=[];
+      DATA.campaigns.forEach(function(c){
+        for(var k=0;k<c.items.length;k++){var it=c.items[k];it.__c=c.name;src.push(it);}
+      });
+    }else{
+      var c=DATA.campaigns[+elCampaign.value];
+      src=c.items;
+      for(var k=0;k<src.length;k++){src[k].__c=c.name;}
+    }
+    pool=src.filter(function(it){
+      if(lang!=='all'&&it.l!==lang) return false;
+      if(tag!=='all'&&String(it.g)!==tag) return false;
+      return true;
+    });
+    recent=[];
+    elPool.innerHTML='มีให้สุ่ม <b>'+fmt(pool.length)+'</b> คอมเมนต์';
+    elRandom.disabled=pool.length===0;
+    if(pool.length===0){
+      showEmpty('ไม่มีคอมเมนต์ที่ตรงเงื่อนไขนี้ ลองปรับตัวกรองดูนะ');
+    }
+  }
+
+  function showEmpty(msg){
+    current=null;
+    elText.className='ctext empty';
+    elText.textContent=msg;
+    elMeta.style.display='none';
+    elCopy.disabled=true; elCopyNext.disabled=true;
+  }
+
+  function pick(){
+    if(pool.length===0) return;
+    var it,tries=0;
+    do{ it=pool[Math.floor(Math.random()*pool.length)]; tries++; }
+    while(pool.length>1 && recent.indexOf(it.t)!==-1 && tries<40);
+    recent.push(it.t);
+    var cap=Math.min(Math.floor(pool.length*0.6), 400);
+    while(recent.length>cap) recent.shift();
+    current=it;
+    render(it);
+  }
+
+  function render(it){
+    elText.className='ctext';
+    elText.textContent=it.t;
+    elMeta.style.display='flex';
+    elMeta.innerHTML='';
+    addTag(it.__c,'');
+    addTag(it.l==='TH'?'ไทย':'ENG','lang');
+    addTag(it.g? 'มีแท็ก @':'ไม่มีแท็ก', it.g?'':'gray');
+    elCopy.disabled=false; elCopyNext.disabled=false;
+    elResult.classList.remove('flash');void elResult.offsetWidth;elResult.classList.add('flash');
+  }
+  function addTag(txt,cls){
+    var s=document.createElement('span'); s.className='tag '+cls; s.textContent=txt; elMeta.appendChild(s);
+  }
+
+  // ----- clipboard (works on file://) -----
+  function copyText(t){
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).then(function(){},function(){fallbackCopy(t);});
+    }else{ fallbackCopy(t); }
+  }
+  function fallbackCopy(t){
+    var ta=document.createElement('textarea');
+    ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try{document.execCommand('copy');}catch(e){}
+    document.body.removeChild(ta);
+  }
+  var toastTimer;
+  function toast(msg){
+    elToast.textContent=msg||'คัดลอกแล้ว ✓';
+    elToast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(function(){elToast.classList.remove('show');},1400);
+  }
+
+  function pushHistory(it){
+    var row=document.createElement('div'); row.className='hist-item';
+    var span=document.createElement('div'); span.className='hx'; span.textContent=it.t;
+    var btn=document.createElement('button'); btn.textContent='คัดลอก';
+    btn.onclick=function(){copyText(it.t);toast();};
+    row.appendChild(span); row.appendChild(btn);
+    if(elHist.firstChild&&elHist.firstChild.className==='hist-empty') elHist.innerHTML='';
+    elHist.insertBefore(row,elHist.firstChild);
+    while(elHist.children.length>8) elHist.removeChild(elHist.lastChild);
+  }
+
+  function doCopy(){
+    if(!current) return;
+    copyText(current.t); toast(); pushHistory(current);
+  }
+
+  // ----- events -----
+  elCampaign.addEventListener('change',function(){rebuildPool();pick();});
+  document.getElementById('langSeg').addEventListener('click',function(e){
+    if(e.target.tagName!=='BUTTON')return;
+    this.querySelectorAll('button').forEach(function(b){b.classList.remove('active');});
+    e.target.classList.add('active'); lang=e.target.dataset.v; rebuildPool(); pick();
+  });
+  document.getElementById('tagSeg').addEventListener('click',function(e){
+    if(e.target.tagName!=='BUTTON')return;
+    this.querySelectorAll('button').forEach(function(b){b.classList.remove('active');});
+    e.target.classList.add('active'); tag=e.target.dataset.v; rebuildPool(); pick();
+  });
+  elRandom.addEventListener('click',pick);
+  elCopy.addEventListener('click',doCopy);
+  elCopyNext.addEventListener('click',function(){doCopy();pick();});
+  document.addEventListener('keydown',function(e){
+    if(e.target.tagName==='SELECT'||e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+    if(e.code==='Space'){e.preventDefault();pick();}
+    else if(e.key==='c'||e.key==='C'){e.preventDefault();doCopy();}
+  });
+
+  // ----- init -----
+  rebuildPool();
+  pick();
+})();
+</script>
+</body>
+</html>
