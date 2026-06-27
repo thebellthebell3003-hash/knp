@@ -104,14 +104,41 @@
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   footer{text-align:center;color:var(--muted);font-size:12px;margin-top:26px;line-height:1.7}
   @media(max-width:560px){h1{font-size:22px}.ctext{font-size:18px}.ctl-row label.lbl{min-width:auto;width:100%}}
+  /* decorative flourishes */
+  .bg{position:fixed;inset:0;overflow:hidden;z-index:0;pointer-events:none}
+  .blob{position:absolute;border-radius:50%;filter:blur(64px);opacity:.5;animation:float 17s ease-in-out infinite}
+  .blob.b1{width:340px;height:340px;background:#fbc3d6;top:-80px;left:-60px}
+  .blob.b2{width:300px;height:300px;background:#cdc4f2;top:18%;right:-80px;animation-delay:-4s}
+  .blob.b3{width:260px;height:260px;background:#f8d3c2;bottom:-60px;left:16%;animation-delay:-9s}
+  .blob.b4{width:230px;height:230px;background:#d8c9f4;bottom:6%;right:20%;animation-delay:-13s}
+  @keyframes float{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(22px,-26px) scale(1.08)}}
+  .heart{position:fixed;bottom:-30px;z-index:0;pointer-events:none;opacity:0;animation:rise linear forwards}
+  @keyframes rise{0%{opacity:0;transform:translateY(0) scale(.7)}12%{opacity:.65}100%{opacity:0;transform:translateY(-112vh) scale(1.12)}}
+  .wrap{position:relative;z-index:1}
+  .stats{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+  .stat{background:rgba(255,255,255,.58);border:1px solid rgba(255,255,255,.72);border-radius:14px;padding:8px 16px;text-align:center;min-width:96px;box-shadow:0 4px 14px rgba(150,110,180,.08)}
+  .stat b{display:block;font-size:18px;font-weight:800;color:var(--ink);line-height:1.2}
+  .stat span{font-size:11.5px;color:var(--muted);letter-spacing:.3px}
+  .prog{height:7px;background:#efe6f3;border-radius:999px;overflow:hidden;margin:2px 2px 6px}
+  .prog>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ec84b0,#9a6fd0);border-radius:999px;transition:width .35s}
+  .spark{position:fixed;z-index:60;pointer-events:none;font-size:16px;animation:burst .9s ease-out forwards}
+  @keyframes burst{0%{opacity:1;transform:translate(0,0) scale(.6)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1.15)}}
+  .result.pop .ctext{animation:popin .36s ease}
+  @keyframes popin{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
+<div class="bg" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span><span class="blob b4"></span></div>
 <div class="wrap">
   <header>
     <div class="badge">✦ ซัพพอร์ตเก่งน้ำปิง · Boost EMV</div>
     <h1>🎀 KNP Comment Support</h1>
     <p class="sub" id="subline">กำลังโหลดคอมเมนต์…</p>
+    <div class="stats" id="stats">
+      <div class="stat"><b id="stTotal">—</b><span>คอมเมนต์</span></div>
+      <div class="stat"><b id="stCamp">—</b><span>แคมเปญ</span></div>
+      <div class="stat"><b id="stCopied">0</b><span>คัดลอกแล้ว</span></div>
+    </div>
   </header>
 
   <div class="card controls">
@@ -148,6 +175,7 @@
       <button class="resetbtn" id="resetUsed">ล้างประวัติ (<span id="usedCount">0</span>)</button>
     </div>
     <div class="pool" id="pool"></div>
+    <div class="prog"><i id="progBar"></i></div>
   </div>
 
   <button class="randombtn" id="randomBtn">🎲 สุ่มคอมเมนต์ <span class="kbd">(เว้นวรรค)</span></button>
@@ -228,6 +256,8 @@
   function updatePoolLine(){
     if(skipUsed)elPool.innerHTML='มีให้สุ่ม <b>'+fmt(pool.length)+'</b> · ยังไม่ได้สุ่ม <b>'+fmt(remaining)+'</b>';
     else elPool.innerHTML='มีให้สุ่ม <b>'+fmt(pool.length)+'</b> คอมเมนต์';
+    var pb=document.getElementById('progBar');
+    if(pb){var p=pool.length?Math.round((pool.length-remaining)/pool.length*100):0;pb.style.width=p+'%';}
   }
   function markSeen(it){if(!seen.has(it.t)){seen.add(it.t);if(remaining>0)remaining--;saveSeen();updatePoolLine();updateUsedCount();}}
   function updateBadges(){
@@ -306,7 +336,7 @@
     if(used.has(it.t)) addTag('✓ คัดลอกแล้ว','used');
     else if(seen.has(it.t)) addTag('เคยสุ่มแล้ว','seen');
     elCopy.disabled=false; elCopyNext.disabled=false;
-    elResult.classList.remove('flash');void elResult.offsetWidth;elResult.classList.add('flash');
+    elResult.classList.remove('flash','pop');void elResult.offsetWidth;elResult.classList.add('flash','pop');
   }
   function addTag(txt,cls){
     var s=document.createElement('span'); s.className='tag '+cls; s.textContent=txt; elMeta.appendChild(s);
@@ -350,7 +380,7 @@
     if(!used.has(current.t)){ used.add(current.t); saveUsed(); }
     markSeen(current);
     updateBadges();
-    updatePoolLine(); updateUsedCount();
+    updatePoolLine(); updateUsedCount(); updateStats(); celebrate();
   }
 
   // ----- campaign combobox -----
@@ -408,7 +438,7 @@
   elResetUsed.addEventListener('click',function(){
     if(!seen.size && !used.size) return;
     if(!confirm('ล้างประวัติทั้งหมด? (เคยสุ่ม '+seen.size+' · คัดลอก '+used.size+')')) return;
-    seen.clear(); used.clear(); saveSeen(); saveUsed(); updateUsedCount(); computeRemaining(); updatePoolLine();
+    seen.clear(); used.clear(); saveSeen(); saveUsed(); updateUsedCount(); computeRemaining(); updatePoolLine(); updateStats();
     updateBadges();
   });
   elRandom.addEventListener('click',pick);
@@ -420,9 +450,33 @@
     else if(e.key==='c'||e.key==='C'){e.preventDefault();doCopy();}
   });
 
+  // ----- decorative flourishes -----
+  var stTotal=document.getElementById('stTotal'),stCamp=document.getElementById('stCamp'),stCopied=document.getElementById('stCopied');
+  function updateStats(){if(stCopied)stCopied.textContent=fmt(used.size);}
+  function fillStats(){if(stTotal)stTotal.textContent=fmt(DATA.total);if(stCamp)stCamp.textContent=fmt(DATA.campaigns.length);updateStats();}
+  var HEARTS=['💕','💗','🤍','✨','🐰','🌸'];
+  function spawnHeart(){
+    var h=document.createElement('div');h.className='heart';h.textContent=HEARTS[Math.floor(Math.random()*HEARTS.length)];
+    h.style.left=(Math.random()*100)+'vw';var dur=7+Math.random()*6;h.style.animationDuration=dur+'s';h.style.fontSize=(13+Math.random()*12)+'px';
+    document.body.appendChild(h);setTimeout(function(){if(h.parentNode)h.parentNode.removeChild(h);},dur*1000+400);
+  }
+  setInterval(spawnHeart,2600);
+  function celebrate(){
+    var r=elCopy.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+    for(var i=0;i<10;i++){
+      var s=document.createElement('div');s.className='spark';s.textContent=HEARTS[Math.floor(Math.random()*4)];
+      s.style.left=cx+'px';s.style.top=cy+'px';
+      var a=Math.random()*Math.PI*2,d=40+Math.random()*60;
+      s.style.setProperty('--dx',(Math.cos(a)*d)+'px');s.style.setProperty('--dy',(Math.sin(a)*d-30)+'px');
+      document.body.appendChild(s);
+      (function(el){setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},950);})(s);
+    }
+  }
+
   // ----- init -----
   elCampInput.value=labelOf(campSel);
   updateUsedCount();
+  fillStats();
   rebuildPool();
   pick();
 })();
