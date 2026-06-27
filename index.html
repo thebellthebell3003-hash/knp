@@ -146,6 +146,13 @@
   .linkitem.done a{color:var(--muted);text-decoration:line-through}
   .linkempty{font-size:12.5px;color:var(--muted);padding:4px 2px;line-height:1.5}
   @media(max-width:840px){.layout{flex-direction:column}.sidebar{width:100%;flex:auto;position:static;order:2}.wrap{order:1;width:100%}}
+  .statitem{padding:8px 0;border-top:1px dashed var(--line)}
+  .statitem:first-child{border-top:0}
+  .statitem .sr{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;margin-bottom:4px}
+  .statitem .sr .nm{color:#5a4a52;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .statitem .sr .ct{color:var(--rose-d);font-weight:800;white-space:nowrap}
+  .statbar{height:6px;border-radius:999px;background:#efe6f3;overflow:hidden}
+  .statbar>i{display:block;height:100%;background:linear-gradient(90deg,#ec84b0,#9a6fd0);border-radius:999px}
 </style>
 </head>
 <body>
@@ -228,6 +235,11 @@
     <div id="histList"><div class="hist-empty">ยังไม่มีรายการที่คัดลอก</div></div>
   </div>
 
+  <div class="card history" style="margin-top:18px">
+    <h2>📊 แคมเปญยอดฮิต · ก็อปไปแล้ว <span id="copyTotal">0</span> ครั้ง</h2>
+    <div id="statsList"><div class="hist-empty">ยังไม่มีสถิติ เริ่มคัดลอกได้เลย</div></div>
+  </div>
+
   <footer>
     ทำงานแบบออฟไลน์ทั้งหมด · ข้อมูลจากไฟล์ KNP commemt support<br>
     เคล็ดลับ: กด <b>เว้นวรรค</b> เพื่อสุ่ม · กด <b>C</b> เพื่อคัดลอก
@@ -275,16 +287,16 @@
 
   // ----- state -----
   var lang='all', tag='all';
-  var campSel='__all__';   // selected campaign value
-  var campActive=-1;       // highlighted index in visible list
-  var campView=[];         // currently visible options
-  var pool=[];            // current filtered array of items
-  var recent=[];          // recently shown texts (avoid repeats)
+  var campSel='__all__';
+  var campActive=-1;
+  var campView=[];
+  var pool=[];
+  var recent=[];
   var current=null;
   var skipUsed=true, remaining=0;
   var LS='knp_used_v1', LS2='knp_seen_v1';
-  var used=new Set();   // copied comments (for ✓ badge)
-  var seen=new Set();   // randomized-or-copied comments (for no-repeat)
+  var used=new Set();
+  var seen=new Set();
   try{var ru=localStorage.getItem(LS);if(ru){JSON.parse(ru).forEach(function(t){used.add(t);});}}catch(e){}
   try{var rs=localStorage.getItem(LS2);if(rs){JSON.parse(rs).forEach(function(t){seen.add(t);});}}catch(e){}
   function saveUsed(){try{localStorage.setItem(LS,JSON.stringify(Array.from(used)));}catch(e){}}
@@ -420,7 +432,7 @@
     if(!used.has(current.t)){ used.add(current.t); saveUsed(); }
     markSeen(current);
     updateBadges();
-    updatePoolLine(); updateUsedCount(); updateStats(); celebrate();
+    updatePoolLine(); updateUsedCount(); updateStats(); celebrate(); recordCopy(current.__c);
   }
 
   // ----- campaign combobox -----
@@ -579,6 +591,49 @@
       (function(el){setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},950);})(s);
     }
   }
+
+  // ----- usage stats (shared via Firebase, fallback localStorage) -----
+  var STAT=null;
+  try{ if(window.firebase&&firebase.apps&&firebase.apps.length&&firebase.database) STAT=firebase.database().ref('stats'); }catch(e){STAT=null;}
+  var SLS='knp_stats_v1';
+  var stat={total:0,camp:{}};
+  var elCopyTotal=document.getElementById('copyTotal'),elStatsList=document.getElementById('statsList');
+  function statKey(s){return ((s||'?').replace(/[.#$/\[\] -]/g,'_').slice(0,180))||'_';}
+  function loadStatLocal(){try{var r=localStorage.getItem(SLS);if(r)stat=JSON.parse(r)||stat;}catch(e){}}
+  function saveStatLocal(){try{localStorage.setItem(SLS,JSON.stringify(stat));}catch(e){}}
+  function recordCopy(name){
+    if(!name)name='?';
+    if(STAT){
+      STAT.child('total').transaction(function(c){return (c||0)+1;});
+      STAT.child('campaigns/'+statKey(name)).transaction(function(o){o=o||{name:name,count:0};o.count=(o.count||0)+1;o.name=name;return o;});
+    }else{
+      stat.total=(stat.total||0)+1; stat.camp[name]=(stat.camp[name]||0)+1; saveStatLocal(); renderStats();
+    }
+  }
+  function renderStats(){
+    if(elCopyTotal)elCopyTotal.textContent=fmt(stat.total||0);
+    var arr=Object.keys(stat.camp||{}).map(function(k){return {name:k,count:stat.camp[k]};});
+    arr.sort(function(a,b){return b.count-a.count;}); arr=arr.slice(0,6);
+    elStatsList.innerHTML='';
+    if(!arr.length){var e=document.createElement('div');e.className='hist-empty';e.textContent='ยังไม่มีสถิติ เริ่มคัดลอกได้เลย';elStatsList.appendChild(e);return;}
+    var max=arr[0].count||1;
+    arr.forEach(function(o){
+      var it=document.createElement('div');it.className='statitem';
+      var sr=document.createElement('div');sr.className='sr';
+      var nm=document.createElement('span');nm.className='nm';nm.textContent=o.name;
+      var ct=document.createElement('span');ct.className='ct';ct.textContent=fmt(o.count);
+      sr.appendChild(nm);sr.appendChild(ct);
+      var bar=document.createElement('div');bar.className='statbar';var bi=document.createElement('i');bi.style.width=Math.round(o.count/max*100)+'%';bar.appendChild(bi);
+      it.appendChild(sr);it.appendChild(bar);elStatsList.appendChild(it);
+    });
+  }
+  if(STAT){
+    STAT.on('value',function(s){
+      var v=s.val()||{}; stat={total:v.total||0,camp:{}};
+      var cs=v.campaigns||{}; Object.keys(cs).forEach(function(k){var o=cs[k]||{};stat.camp[o.name||k]=o.count||0;});
+      renderStats();
+    });
+  }else{ loadStatLocal(); renderStats(); }
 
   // ----- init -----
   elCampInput.value=labelOf(campSel);
