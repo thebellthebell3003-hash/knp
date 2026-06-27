@@ -141,7 +141,7 @@
   .linkitem{display:flex;align-items:center;gap:6px;padding:8px;border-radius:10px;background:#faf5fb;margin-bottom:7px}
   .linkitem a{flex:1;font-size:13.5px;color:var(--rose-d);text-decoration:none;font-weight:600;word-break:break-word;line-height:1.35}
   .linkitem a:hover{text-decoration:underline}
-  .linkitem .chk,.linkitem .del{border:0;background:transparent;cursor:pointer;line-height:1;padding:2px 3px;font-size:14px}
+  .linkitem .chk,.linkitem .del,.linkitem .edit{border:0;background:transparent;cursor:pointer;line-height:1;padding:2px 3px;font-size:14px}
   .linkitem .del{color:#bb88a8}
   .linkitem.done a{color:var(--muted);text-decoration:line-through}
   .linkempty{font-size:12.5px;color:var(--muted);padding:4px 2px;line-height:1.5}
@@ -511,9 +511,11 @@
       var chk=document.createElement('button');chk.className='chk';chk.title='ทำเครื่องหมายว่าคอมเมนต์แล้ว';chk.textContent=L.done?'✅':'⬜';
       chk.onclick=function(){toggleLink(L,i);};
       var a=document.createElement('a');a.href=normUrl(L.url);a.target='_blank';a.rel='noopener noreferrer';a.textContent=L.name||L.url;
+      var ed=document.createElement('button');ed.className='edit';ed.title='แก้ไขชื่อ';ed.textContent='✏️';
+      ed.onclick=function(){editLink(L,i);};
       var del=document.createElement('button');del.className='del';del.title='ลบ';del.textContent='✕';
       del.onclick=function(){delLink(L,i);};
-      row.appendChild(chk);row.appendChild(a);row.appendChild(del);elLinkList.appendChild(row);
+      row.appendChild(chk);row.appendChild(a);row.appendChild(ed);row.appendChild(del);elLinkList.appendChild(row);
     });
   }
   function addLink(){
@@ -531,6 +533,13 @@
   function delLink(L,i){
     if(FB&&L.key){FB.child(L.key).remove();}
     else{links.splice(i,1);saveLocal();renderLinks();}
+  }
+  function editLink(L,i){
+    var nn=prompt('แก้ไขชื่อลิงก์:',L.name||'');
+    if(nn===null)return;
+    nn=nn.trim();
+    if(FB&&L.key){FB.child(L.key).update({name:nn});}
+    else{links[i].name=nn;saveLocal();renderLinks();}
   }
   if(FB){
     FB.on('value',function(snap){
