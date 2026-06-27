@@ -282,12 +282,12 @@
   elSub.innerHTML='สุ่มคอมเมนต์ซัพพอร์ตเก่งน้ำปิง · รวม <b>'+fmt(DATA.total)+'</b> คอมเมนต์ จาก <b>'+DATA.campaigns.length+'</b> แคมเปญ';
 
   // ----- campaign options (searchable combobox) -----
-  var campOptions=[{v:'__all__',name:'⭐ ทุกแคมเปญรวมกัน',count:DATA.total}];
+  var campOptions=[];
   DATA.campaigns.forEach(function(c,i){ campOptions.push({v:String(i),name:c.name,count:c.count}); });
 
   // ----- state -----
   var lang='all', tag='all';
-  var campSel='__all__';
+  var campSel='0';
   var campActive=-1;
   var campView=[];
   var pool=[];
