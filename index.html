@@ -73,6 +73,10 @@
   .tag{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--rose-soft);color:var(--rose-d)}
   .tag.lang{background:#e6f3ff;color:#1f6fb2}
   .tag.gray{background:#eee;color:#777}
+  .tag.used{background:#e6f7ee;color:#1f9d57}
+  .tag.seen{background:#efe9f3;color:#9b7fb0}
+  .resetbtn{font:inherit;font-size:12.5px;font-weight:700;border-radius:10px;padding:7px 12px;cursor:pointer;border:1.5px solid var(--line);background:#fff;color:var(--rose-d);white-space:nowrap}
+  .resetbtn:hover{background:#fff6fa;border-color:var(--rose)}
   .ctext{font-size:20px;line-height:1.6;font-weight:500;flex:1;white-space:pre-wrap;word-break:break-word}
   .ctext.empty{color:var(--muted);font-weight:400;font-size:16px;display:flex;align-items:center;justify-content:center;text-align:center;min-height:80px}
   .actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
@@ -132,6 +136,14 @@
         <button data-v="1">มีแท็ก @</button>
         <button data-v="0">ไม่มีแท็ก</button>
       </div>
+    </div>
+    <div class="ctl-row">
+      <label class="lbl">ไม่ซ้ำ</label>
+      <div class="seg" id="usedSeg">
+        <button data-v="skip" class="active">ข้ามที่เคยสุ่ม/คัดลอก</button>
+        <button data-v="show">แสดงทั้งหมด</button>
+      </div>
+      <button class="resetbtn" id="resetUsed">ล้างประวัติ (<span id="usedCount">0</span>)</button>
     </div>
     <div class="pool" id="pool"></div>
   </div>
@@ -199,6 +211,30 @@
   var pool=[];            // current filtered array of items
   var recent=[];          // recently shown texts (avoid repeats)
   var current=null;
+  var skipUsed=true, remaining=0;
+  var LS='knp_used_v1', LS2='knp_seen_v1';
+  var used=new Set();   // copied comments (for ✓ badge)
+  var seen=new Set();   // randomized-or-copied comments (for no-repeat)
+  try{var ru=localStorage.getItem(LS);if(ru){JSON.parse(ru).forEach(function(t){used.add(t);});}}catch(e){}
+  try{var rs=localStorage.getItem(LS2);if(rs){JSON.parse(rs).forEach(function(t){seen.add(t);});}}catch(e){}
+  function saveUsed(){try{localStorage.setItem(LS,JSON.stringify(Array.from(used)));}catch(e){}}
+  function saveSeen(){try{localStorage.setItem(LS2,JSON.stringify(Array.from(seen)));}catch(e){}}
+  var elUsedCount=document.getElementById('usedCount');
+  var elResetUsed=document.getElementById('resetUsed');
+  function updateUsedCount(){if(elUsedCount)elUsedCount.textContent=fmt(seen.size);}
+  function computeRemaining(){var n=0;for(var i=0;i<pool.length;i++){if(!seen.has(pool[i].t))n++;}remaining=n;}
+  function updatePoolLine(){
+    if(skipUsed)elPool.innerHTML='มีให้สุ่ม <b>'+fmt(pool.length)+'</b> · ยังไม่ได้สุ่ม <b>'+fmt(remaining)+'</b>';
+    else elPool.innerHTML='มีให้สุ่ม <b>'+fmt(pool.length)+'</b> คอมเมนต์';
+  }
+  function markSeen(it){if(!seen.has(it.t)){seen.add(it.t);if(remaining>0)remaining--;saveSeen();updatePoolLine();updateUsedCount();}}
+  function updateBadges(){
+    if(!current)return;
+    var olds=elMeta.querySelectorAll('.tag.used,.tag.seen');
+    for(var i=0;i<olds.length;i++)olds[i].parentNode.removeChild(olds[i]);
+    if(used.has(current.t))addTag('✓ คัดลอกแล้ว','used');
+    else if(seen.has(current.t))addTag('เคยสุ่มแล้ว','seen');
+  }
 
   function rebuildPool(){
     var src;
@@ -218,7 +254,8 @@
       return true;
     });
     recent=[];
-    elPool.innerHTML='มีให้สุ่ม <b>'+fmt(pool.length)+'</b> คอมเมนต์';
+    computeRemaining();
+    updatePoolLine();
     elRandom.disabled=pool.length===0;
     if(pool.length===0){
       showEmpty('ไม่มีคอมเมนต์ที่ตรงเงื่อนไขนี้ ลองปรับตัวกรองดูนะ');
@@ -235,14 +272,25 @@
 
   function pick(){
     if(pool.length===0) return;
-    var it,tries=0;
-    do{ it=pool[Math.floor(Math.random()*pool.length)]; tries++; }
-    while(pool.length>1 && recent.indexOf(it.t)!==-1 && tries<40);
+    var it=null,tries=0;
+    if(skipUsed && remaining>0){
+      do{ it=pool[Math.floor(Math.random()*pool.length)]; tries++; }
+      while(tries<100 && (seen.has(it.t) || (pool.length>1 && recent.indexOf(it.t)!==-1)));
+      if(seen.has(it.t)){
+        var avail=pool.filter(function(x){return !seen.has(x.t);});
+        if(avail.length) it=avail[Math.floor(Math.random()*avail.length)];
+      }
+    } else {
+      if(skipUsed && remaining===0 && pool.length>0) toast('สุ่มครบทุกคำในชุดนี้แล้ว 🎉 (จากนี้จะวนซ้ำ)');
+      do{ it=pool[Math.floor(Math.random()*pool.length)]; tries++; }
+      while(pool.length>1 && recent.indexOf(it.t)!==-1 && tries<40);
+    }
     recent.push(it.t);
     var cap=Math.min(Math.floor(pool.length*0.6), 400);
     while(recent.length>cap) recent.shift();
     current=it;
     render(it);
+    markSeen(it);
   }
 
   function render(it){
@@ -253,6 +301,8 @@
     addTag(it.__c,'');
     addTag(it.l==='TH'?'ไทย':'ENG','lang');
     addTag(it.g? 'มีแท็ก @':'ไม่มีแท็ก', it.g?'':'gray');
+    if(used.has(it.t)) addTag('✓ คัดลอกแล้ว','used');
+    else if(seen.has(it.t)) addTag('เคยสุ่มแล้ว','seen');
     elCopy.disabled=false; elCopyNext.disabled=false;
     elResult.classList.remove('flash');void elResult.offsetWidth;elResult.classList.add('flash');
   }
@@ -295,6 +345,10 @@
   function doCopy(){
     if(!current) return;
     copyText(current.t); toast(); pushHistory(current);
+    if(!used.has(current.t)){ used.add(current.t); saveUsed(); }
+    markSeen(current);
+    updateBadges();
+    updatePoolLine(); updateUsedCount();
   }
 
   // ----- campaign combobox -----
@@ -344,6 +398,17 @@
     this.querySelectorAll('button').forEach(function(b){b.classList.remove('active');});
     e.target.classList.add('active'); tag=e.target.dataset.v; rebuildPool(); pick();
   });
+  document.getElementById('usedSeg').addEventListener('click',function(e){
+    if(e.target.tagName!=='BUTTON')return;
+    this.querySelectorAll('button').forEach(function(b){b.classList.remove('active');});
+    e.target.classList.add('active'); skipUsed=(e.target.dataset.v==='skip'); updatePoolLine();
+  });
+  elResetUsed.addEventListener('click',function(){
+    if(!seen.size && !used.size) return;
+    if(!confirm('ล้างประวัติทั้งหมด? (เคยสุ่ม '+seen.size+' · คัดลอก '+used.size+')')) return;
+    seen.clear(); used.clear(); saveSeen(); saveUsed(); updateUsedCount(); computeRemaining(); updatePoolLine();
+    updateBadges();
+  });
   elRandom.addEventListener('click',pick);
   elCopy.addEventListener('click',doCopy);
   elCopyNext.addEventListener('click',function(){doCopy();pick();});
@@ -355,6 +420,7 @@
 
   // ----- init -----
   elCampInput.value=labelOf(campSel);
+  updateUsedCount();
   rebuildPool();
   pick();
 })();
