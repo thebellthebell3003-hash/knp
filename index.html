@@ -136,6 +136,8 @@
   .addlink input:focus{outline:none;border-color:var(--rose-d)}
   .addlink button{font:inherit;font-size:14px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--rose),var(--rose-d));border:0;border-radius:10px;padding:11px;cursor:pointer}
   .addlink button:hover{filter:brightness(1.05)}
+  .linksearch{width:100%;font:inherit;font-size:13.5px;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);margin-bottom:10px}
+  .linksearch:focus{outline:none;border-color:var(--rose-d)}
   .linkitem{display:flex;align-items:center;gap:6px;padding:8px;border-radius:10px;background:#faf5fb;margin-bottom:7px}
   .linkitem a{flex:1;font-size:13.5px;color:var(--rose-d);text-decoration:none;font-weight:600;word-break:break-word;line-height:1.35}
   .linkitem a:hover{text-decoration:underline}
@@ -157,6 +159,7 @@
         <input id="linkUrl" type="text" autocomplete="off" placeholder="วางลิงก์โพสต์ที่นี่…">
         <button id="addLink">+ เพิ่มลิงก์</button>
       </div>
+      <input id="linkSearch" class="linksearch" type="text" autocomplete="off" placeholder="🔍 ค้นหาลิงก์…">
       <div id="linkList"></div>
     </div>
   </aside>
@@ -236,6 +239,11 @@
 
 <script src="comments_data.js"></script>
 <script src="matinkim_data.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+  try{firebase.initializeApp({apiKey:"AIzaSyBJJLo7LLOHp-9N7k57b_M-ekNaD5UbE08",authDomain:"knp-links.firebaseapp.com",databaseURL:"https://knp-links-default-rtdb.firebaseio.com",projectId:"knp-links",storageBucket:"knp-links.firebasestorage.app",messagingSenderId:"383442104897",appId:"1:383442104897:web:89927acec01d1be3670cc0"});}catch(e){}
+</script>
 <script>
 (function(){
   "use strict";
@@ -482,37 +490,63 @@
     else if(e.key==='c'||e.key==='C'){e.preventDefault();doCopy();}
   });
 
-  // ----- post links sidebar -----
+  // ----- post links sidebar (shared via Firebase, fallback localStorage) -----
   var LSL='knp_links_v1';
   var links=[];
-  try{var rl=localStorage.getItem(LSL);if(rl)links=JSON.parse(rl)||[];}catch(e){}
-  var elLinkName=document.getElementById('linkName'),elLinkUrl=document.getElementById('linkUrl'),elAddLink=document.getElementById('addLink'),elLinkList=document.getElementById('linkList');
-  function saveLinks(){try{localStorage.setItem(LSL,JSON.stringify(links));}catch(e){}}
+  var linkFilter='';
+  var FB=null;
+  try{ if(window.firebase&&firebase.apps&&firebase.apps.length&&firebase.database) FB=firebase.database().ref('links'); }catch(e){FB=null;}
+  var elLinkName=document.getElementById('linkName'),elLinkUrl=document.getElementById('linkUrl'),elAddLink=document.getElementById('addLink'),elLinkList=document.getElementById('linkList'),elLinkSearch=document.getElementById('linkSearch');
+  function saveLocal(){try{localStorage.setItem(LSL,JSON.stringify(links));}catch(e){}}
   function normUrl(u){u=(u||'').trim();if(!u)return '';if(!/^https?:\/\//i.test(u))u='https://'+u;return u;}
   function renderLinks(){
     elLinkList.innerHTML='';
     if(!links.length){var e=document.createElement('div');e.className='linkempty';e.textContent='ยังไม่มีลิงก์ — วางลิงก์โพสต์แล้วกดเพิ่ม';elLinkList.appendChild(e);return;}
-    links.forEach(function(L,i){
+    var view=links.map(function(L,i){return {L:L,i:i};});
+    if(linkFilter)view=view.filter(function(o){return ((o.L.name||'')+' '+(o.L.url||'')).toLowerCase().indexOf(linkFilter)!==-1;});
+    if(!view.length){var e2=document.createElement('div');e2.className='linkempty';e2.textContent='ไม่พบลิงก์ที่ค้นหา';elLinkList.appendChild(e2);return;}
+    view.forEach(function(o){
+      var L=o.L,i=o.i;
       var row=document.createElement('div');row.className='linkitem'+(L.done?' done':'');
       var chk=document.createElement('button');chk.className='chk';chk.title='ทำเครื่องหมายว่าคอมเมนต์แล้ว';chk.textContent=L.done?'✅':'⬜';
-      chk.onclick=function(){L.done=!L.done;saveLinks();renderLinks();};
+      chk.onclick=function(){toggleLink(L,i);};
       var a=document.createElement('a');a.href=normUrl(L.url);a.target='_blank';a.rel='noopener noreferrer';a.textContent=L.name||L.url;
       var del=document.createElement('button');del.className='del';del.title='ลบ';del.textContent='✕';
-      del.onclick=function(){links.splice(i,1);saveLinks();renderLinks();};
+      del.onclick=function(){delLink(L,i);};
       row.appendChild(chk);row.appendChild(a);row.appendChild(del);elLinkList.appendChild(row);
     });
   }
   function addLink(){
     var url=normUrl(elLinkUrl.value);
     if(!url){elLinkUrl.focus();return;}
-    links.unshift({name:(elLinkName.value||'').trim(),url:url,done:false});
-    saveLinks();renderLinks();
+    var name=(elLinkName.value||'').trim();
+    if(FB){FB.push({name:name,url:url,done:false,ts:Date.now()});}
+    else{links.unshift({name:name,url:url,done:false,ts:Date.now()});saveLocal();renderLinks();}
     elLinkName.value='';elLinkUrl.value='';elLinkUrl.focus();
   }
+  function toggleLink(L,i){
+    if(FB&&L.key){FB.child(L.key).update({done:!L.done});}
+    else{links[i].done=!links[i].done;saveLocal();renderLinks();}
+  }
+  function delLink(L,i){
+    if(FB&&L.key){FB.child(L.key).remove();}
+    else{links.splice(i,1);saveLocal();renderLinks();}
+  }
+  if(FB){
+    FB.on('value',function(snap){
+      var v=snap.val()||{};
+      links=Object.keys(v).map(function(k){var o=v[k]||{};return {key:k,name:o.name||'',url:o.url||'',done:!!o.done,ts:o.ts||0};});
+      links.sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+      renderLinks();
+    });
+  }else{
+    try{var rl=localStorage.getItem(LSL);if(rl)links=JSON.parse(rl)||[];}catch(e){}
+    renderLinks();
+  }
   elAddLink.addEventListener('click',addLink);
+  elLinkSearch.addEventListener('input',function(){linkFilter=this.value.trim().toLowerCase();renderLinks();});
   elLinkUrl.addEventListener('keydown',function(e){if(e.key==='Enter')addLink();});
   elLinkName.addEventListener('keydown',function(e){if(e.key==='Enter')elLinkUrl.focus();});
-  renderLinks();
 
   // ----- decorative flourishes -----
   var stTotal=document.getElementById('stTotal'),stCamp=document.getElementById('stCamp'),stCopied=document.getElementById('stCopied');
