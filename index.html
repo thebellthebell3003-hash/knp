@@ -125,11 +125,42 @@
   @keyframes burst{0%{opacity:1;transform:translate(0,0) scale(.6)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1.15)}}
   .result.pop .ctext{animation:popin .36s ease}
   @keyframes popin{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
+  /* layout + post-links sidebar */
+  .layout{display:flex;gap:20px;max-width:1120px;margin:0 auto;align-items:flex-start;position:relative;z-index:1}
+  .sidebar{width:280px;flex:0 0 280px;position:sticky;top:18px}
+  .wrap{flex:1}
+  .sidecard{padding:16px 16px 18px}
+  .sidecard h2{font-size:16px;margin:0 0 12px;color:var(--ink);font-weight:800}
+  .addlink{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+  .addlink input{font:inherit;font-size:14px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink)}
+  .addlink input:focus{outline:none;border-color:var(--rose-d)}
+  .addlink button{font:inherit;font-size:14px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--rose),var(--rose-d));border:0;border-radius:10px;padding:11px;cursor:pointer}
+  .addlink button:hover{filter:brightness(1.05)}
+  .linkitem{display:flex;align-items:center;gap:6px;padding:8px;border-radius:10px;background:#faf5fb;margin-bottom:7px}
+  .linkitem a{flex:1;font-size:13.5px;color:var(--rose-d);text-decoration:none;font-weight:600;word-break:break-word;line-height:1.35}
+  .linkitem a:hover{text-decoration:underline}
+  .linkitem .chk,.linkitem .del{border:0;background:transparent;cursor:pointer;line-height:1;padding:2px 3px;font-size:14px}
+  .linkitem .del{color:#bb88a8}
+  .linkitem.done a{color:var(--muted);text-decoration:line-through}
+  .linkempty{font-size:12.5px;color:var(--muted);padding:4px 2px;line-height:1.5}
+  @media(max-width:840px){.layout{flex-direction:column}.sidebar{width:100%;flex:auto;position:static;order:2}.wrap{order:1;width:100%}}
 </style>
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span><span class="blob b4"></span></div>
-<div class="wrap">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="card sidecard">
+      <h2>🔗 ลิงก์โพสต์</h2>
+      <div class="addlink">
+        <input id="linkName" type="text" autocomplete="off" placeholder="ชื่อ (เช่น Vogue IG)">
+        <input id="linkUrl" type="text" autocomplete="off" placeholder="วางลิงก์โพสต์ที่นี่…">
+        <button id="addLink">+ เพิ่มลิงก์</button>
+      </div>
+      <div id="linkList"></div>
+    </div>
+  </aside>
+  <div class="wrap">
   <header>
     <div class="badge">✦ ซัพพอร์ตเก่งน้ำปิง · Boost EMV</div>
     <h1>🎀 KNP Comment Support</h1>
@@ -198,6 +229,7 @@
     ทำงานแบบออฟไลน์ทั้งหมด · ข้อมูลจากไฟล์ KNP commemt support<br>
     เคล็ดลับ: กด <b>เว้นวรรค</b> เพื่อสุ่ม · กด <b>C</b> เพื่อคัดลอก
   </footer>
+  </div>
 </div>
 
 <div class="toast" id="toast">คัดลอกแล้ว ✓</div>
@@ -449,6 +481,38 @@
     if(e.code==='Space'){e.preventDefault();pick();}
     else if(e.key==='c'||e.key==='C'){e.preventDefault();doCopy();}
   });
+
+  // ----- post links sidebar -----
+  var LSL='knp_links_v1';
+  var links=[];
+  try{var rl=localStorage.getItem(LSL);if(rl)links=JSON.parse(rl)||[];}catch(e){}
+  var elLinkName=document.getElementById('linkName'),elLinkUrl=document.getElementById('linkUrl'),elAddLink=document.getElementById('addLink'),elLinkList=document.getElementById('linkList');
+  function saveLinks(){try{localStorage.setItem(LSL,JSON.stringify(links));}catch(e){}}
+  function normUrl(u){u=(u||'').trim();if(!u)return '';if(!/^https?:\/\//i.test(u))u='https://'+u;return u;}
+  function renderLinks(){
+    elLinkList.innerHTML='';
+    if(!links.length){var e=document.createElement('div');e.className='linkempty';e.textContent='ยังไม่มีลิงก์ — วางลิงก์โพสต์แล้วกดเพิ่ม';elLinkList.appendChild(e);return;}
+    links.forEach(function(L,i){
+      var row=document.createElement('div');row.className='linkitem'+(L.done?' done':'');
+      var chk=document.createElement('button');chk.className='chk';chk.title='ทำเครื่องหมายว่าคอมเมนต์แล้ว';chk.textContent=L.done?'✅':'⬜';
+      chk.onclick=function(){L.done=!L.done;saveLinks();renderLinks();};
+      var a=document.createElement('a');a.href=normUrl(L.url);a.target='_blank';a.rel='noopener noreferrer';a.textContent=L.name||L.url;
+      var del=document.createElement('button');del.className='del';del.title='ลบ';del.textContent='✕';
+      del.onclick=function(){links.splice(i,1);saveLinks();renderLinks();};
+      row.appendChild(chk);row.appendChild(a);row.appendChild(del);elLinkList.appendChild(row);
+    });
+  }
+  function addLink(){
+    var url=normUrl(elLinkUrl.value);
+    if(!url){elLinkUrl.focus();return;}
+    links.unshift({name:(elLinkName.value||'').trim(),url:url,done:false});
+    saveLinks();renderLinks();
+    elLinkName.value='';elLinkUrl.value='';elLinkUrl.focus();
+  }
+  elAddLink.addEventListener('click',addLink);
+  elLinkUrl.addEventListener('keydown',function(e){if(e.key==='Enter')addLink();});
+  elLinkName.addEventListener('keydown',function(e){if(e.key==='Enter')elLinkUrl.focus();});
+  renderLinks();
 
   // ----- decorative flourishes -----
   var stTotal=document.getElementById('stTotal'),stCamp=document.getElementById('stCamp'),stCopied=document.getElementById('stCopied');
