@@ -204,7 +204,7 @@
     <div class="stats" id="stats">
       <div class="stat"><b id="stTotal">—</b><span>คอมเมนต์</span></div>
       <div class="stat"><b id="stCamp">—</b><span>แคมเปญ</span></div>
-      <div class="stat"><b id="stCopied">0</b><span>คัดลอกแล้ว</span></div>
+      <div class="stat"><b id="stCopied">0</b><span>ก็อปไปแล้ว (รอบ)</span></div>
     </div>
   </header>
 
@@ -472,7 +472,7 @@
     if(!used.has(current.t)){ used.add(current.t); saveUsed(); }
     markSeen(current);
     updateBadges();
-    updatePoolLine(); updateUsedCount(); updateStats(); celebrate(); recordCopy(current.__c); startCooldown();
+    myCopies++; saveMyCopies(); updatePoolLine(); updateUsedCount(); updateStats(); celebrate(); recordCopy(current.__c); startCooldown();
   }
 
   // ----- campaign combobox -----
@@ -547,6 +547,10 @@
   var links=[];
   var linkFilter='';
   var linkStatus='all';
+  var MYDONE='knp_mydone_v1', myDone={};
+  try{var md=localStorage.getItem(MYDONE);if(md)myDone=JSON.parse(md)||{};}catch(e){}
+  function saveMyDone(){try{localStorage.setItem(MYDONE,JSON.stringify(myDone));}catch(e){}}
+  function linkId(L){return L.key||normUrl(L.url)||L.name||'';}
   var FB=null;
   try{ if(window.firebase&&firebase.apps&&firebase.apps.length&&firebase.database) FB=firebase.database().ref('links'); }catch(e){FB=null;}
   var elLinkName=document.getElementById('linkName'),elLinkUrl=document.getElementById('linkUrl'),elAddLink=document.getElementById('addLink'),elLinkList=document.getElementById('linkList'),elLinkSearch=document.getElementById('linkSearch');
@@ -557,12 +561,13 @@
     if(!links.length){var e=document.createElement('div');e.className='linkempty';e.textContent='ยังไม่มีลิงก์ — วางลิงก์โพสต์แล้วกดเพิ่ม';elLinkList.appendChild(e);return;}
     var view=links.map(function(L,i){return {L:L,i:i};});
     if(linkFilter)view=view.filter(function(o){return ((o.L.name||'')+' '+(o.L.url||'')).toLowerCase().indexOf(linkFilter)!==-1;});
-    if(linkStatus!=='all')view=view.filter(function(o){return linkStatus==='done'?o.L.done:!o.L.done;});
+    if(linkStatus!=='all')view=view.filter(function(o){var d=!!myDone[linkId(o.L)];return linkStatus==='done'?d:!d;});
     if(!view.length){var e2=document.createElement('div');e2.className='linkempty';e2.textContent='ไม่พบลิงก์ที่ตรงเงื่อนไข';elLinkList.appendChild(e2);return;}
     view.forEach(function(o){
       var L=o.L,i=o.i;
-      var row=document.createElement('div');row.className='linkitem'+(L.done?' done':'');
-      var chk=document.createElement('button');chk.className='chk';chk.title='ทำเครื่องหมายว่าคอมเมนต์แล้ว';chk.textContent=L.done?'✅':'⬜';
+      var mydone=!!myDone[linkId(L)];
+      var row=document.createElement('div');row.className='linkitem'+(mydone?' done':'');
+      var chk=document.createElement('button');chk.className='chk';chk.title='ทำเครื่องหมายว่า ฉันคอมโพสต์นี้แล้ว';chk.textContent=mydone?'✅':'⬜';
       chk.onclick=function(){toggleLink(L,i);};
       var a=document.createElement('a');a.href=normUrl(L.url);a.target='_blank';a.rel='noopener noreferrer';a.textContent=L.name||L.url;
       var ed=document.createElement('button');ed.className='edit';ed.title='แก้ไขชื่อ';ed.textContent='✏️';
@@ -581,8 +586,9 @@
     elLinkName.value='';elLinkUrl.value='';elLinkUrl.focus();
   }
   function toggleLink(L,i){
-    if(FB&&L.key){FB.child(L.key).update({done:!L.done});}
-    else{links[i].done=!links[i].done;saveLocal();renderLinks();}
+    var id=linkId(L);
+    if(myDone[id]){delete myDone[id];}else{myDone[id]=true;}
+    saveMyDone(); renderLinks();
   }
   function delLink(L,i){
     if(FB&&L.key){FB.child(L.key).remove();}
@@ -684,7 +690,10 @@
 
   // ----- decorative flourishes -----
   var stTotal=document.getElementById('stTotal'),stCamp=document.getElementById('stCamp'),stCopied=document.getElementById('stCopied');
-  function updateStats(){if(stCopied)stCopied.textContent=fmt(used.size);}
+  var MYC='knp_mycopies_v1', myCopies=0;
+  try{myCopies=parseInt(localStorage.getItem(MYC),10)||0;}catch(e){}
+  function saveMyCopies(){try{localStorage.setItem(MYC,String(myCopies));}catch(e){}}
+  function updateStats(){if(stCopied)stCopied.textContent=fmt(myCopies);}
   function fillStats(){if(stTotal)stTotal.textContent=fmt(DATA.total);if(stCamp)stCamp.textContent=fmt(DATA.campaigns.length);updateStats();}
   var HEARTS=['💕','💗','🤍','✨','🐰','🌸'];
   function spawnHeart(){
