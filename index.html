@@ -76,6 +76,7 @@
   .tag.gray{background:#eee;color:#777}
   .tag.used{background:#e6f7ee;color:#1f9d57}
   .tag.seen{background:#efe9f3;color:#9b7fb0}
+  .tag.cnt{background:#eef0fb;color:#5a6bb0}
   .resetbtn{font:inherit;font-size:12.5px;font-weight:700;border-radius:10px;padding:7px 12px;cursor:pointer;border:1.5px solid var(--line);background:#fff;color:var(--rose-d);white-space:nowrap}
   .resetbtn:hover{background:#fff6fa;border-color:var(--rose)}
   .ctext{font-size:20px;line-height:1.6;font-weight:500;flex:1;white-space:pre-wrap;word-break:break-word}
@@ -427,6 +428,7 @@
     addTag(it.g? 'มีแท็ก @':'ไม่มีแท็ก', it.g?'':'gray');
     if(used.has(it.t)) addTag('✓ คัดลอกแล้ว','used');
     else if(seen.has(it.t)) addTag('เคยสุ่มแล้ว','seen');
+    var ctag=document.createElement('span');ctag.className='tag cnt';ctag.id='cmtCnt';ctag.textContent='ก็อปแล้ว '+fmt(cmtCounts[hsh(it.t)]||0)+' ครั้ง';elMeta.appendChild(ctag);
     elCopy.disabled=false; elCopyNext.disabled=false;
     elResult.classList.remove('flash','pop');void elResult.offsetWidth;elResult.classList.add('flash','pop');
   }
@@ -472,7 +474,7 @@
     if(!used.has(current.t)){ used.add(current.t); saveUsed(); }
     markSeen(current);
     updateBadges();
-    myCopies++; saveMyCopies(); updatePoolLine(); updateUsedCount(); updateStats(); celebrate(); recordCopy(current.__c); startCooldown();
+    myCopies++; saveMyCopies(); updatePoolLine(); updateUsedCount(); updateStats(); celebrate(); recordCopy(current.__c); recordCmt(current.t); startCooldown();
   }
 
   // ----- campaign combobox -----
@@ -731,6 +733,13 @@
   // ----- usage stats (shared via Firebase, fallback localStorage) -----
   var STAT=null;
   try{ if(window.firebase&&firebase.apps&&firebase.apps.length&&firebase.database) STAT=firebase.database().ref('stats'); }catch(e){STAT=null;}
+  var cmtCounts={};
+  var cmtRef=null;
+  try{ if(STAT) cmtRef=firebase.database().ref('cmt'); }catch(e){cmtRef=null;}
+  function hsh(s){var h=5381,i=s.length;while(i){h=(h*33)^s.charCodeAt(--i);}return (h>>>0).toString(36);}
+  function updateCmtBadge(){var el=document.getElementById('cmtCnt');if(el&&current)el.textContent='ก็อปแล้ว '+fmt(cmtCounts[hsh(current.t)]||0)+' ครั้ง';}
+  function recordCmt(t){var h=hsh(t);cmtCounts[h]=(cmtCounts[h]||0)+1;if(cmtRef)cmtRef.child(h).transaction(function(c){return (c||0)+1;});updateCmtBadge();}
+  if(cmtRef){cmtRef.on('child_added',function(s){cmtCounts[s.key]=s.val();updateCmtBadge();});cmtRef.on('child_changed',function(s){cmtCounts[s.key]=s.val();updateCmtBadge();});}
   var SLS='knp_stats_v1';
   var stat={total:0,camp:{}};
   var elCopyTotal=document.getElementById('copyTotal'),elStatsList=document.getElementById('statsList');
