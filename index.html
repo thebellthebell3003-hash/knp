@@ -159,6 +159,9 @@
   .cool-bar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ec84b0,#9a6fd0);border-radius:999px;transition:width .12s linear}
   .cooldown.done .cool-txt{color:var(--ok)}
   .cooldown.done .cool-bar>i{background:var(--ok)}
+  .linkfilter{display:flex;gap:4px;background:var(--chip);border-radius:9px;padding:3px;margin-bottom:8px}
+  .linkfilter button{flex:1;font:inherit;font-size:11.5px;font-weight:600;border:0;background:transparent;color:var(--muted);padding:6px 4px;border-radius:7px;cursor:pointer}
+  .linkfilter button.active{background:#fff;color:var(--rose-d);box-shadow:0 1px 3px rgba(150,110,180,.18)}
 </style>
 </head>
 <body>
@@ -173,6 +176,11 @@
         <button id="addLink">+ เพิ่มลิงก์</button>
       </div>
       <input id="linkSearch" class="linksearch" type="text" autocomplete="off" placeholder="🔍 ค้นหาลิงก์…">
+      <div class="linkfilter" id="linkFilterSeg">
+        <button data-v="all" class="active">ทั้งหมด</button>
+        <button data-v="undone">ยังไม่คอม</button>
+        <button data-v="done">คอมแล้ว</button>
+      </div>
       <div id="linkList"></div>
     </div>
     <div class="card sidecard" style="margin-top:14px">
@@ -536,6 +544,7 @@
   var LSL='knp_links_v1';
   var links=[];
   var linkFilter='';
+  var linkStatus='all';
   var FB=null;
   try{ if(window.firebase&&firebase.apps&&firebase.apps.length&&firebase.database) FB=firebase.database().ref('links'); }catch(e){FB=null;}
   var elLinkName=document.getElementById('linkName'),elLinkUrl=document.getElementById('linkUrl'),elAddLink=document.getElementById('addLink'),elLinkList=document.getElementById('linkList'),elLinkSearch=document.getElementById('linkSearch');
@@ -546,7 +555,8 @@
     if(!links.length){var e=document.createElement('div');e.className='linkempty';e.textContent='ยังไม่มีลิงก์ — วางลิงก์โพสต์แล้วกดเพิ่ม';elLinkList.appendChild(e);return;}
     var view=links.map(function(L,i){return {L:L,i:i};});
     if(linkFilter)view=view.filter(function(o){return ((o.L.name||'')+' '+(o.L.url||'')).toLowerCase().indexOf(linkFilter)!==-1;});
-    if(!view.length){var e2=document.createElement('div');e2.className='linkempty';e2.textContent='ไม่พบลิงก์ที่ค้นหา';elLinkList.appendChild(e2);return;}
+    if(linkStatus!=='all')view=view.filter(function(o){return linkStatus==='done'?o.L.done:!o.L.done;});
+    if(!view.length){var e2=document.createElement('div');e2.className='linkempty';e2.textContent='ไม่พบลิงก์ที่ตรงเงื่อนไข';elLinkList.appendChild(e2);return;}
     view.forEach(function(o){
       var L=o.L,i=o.i;
       var row=document.createElement('div');row.className='linkitem'+(L.done?' done':'');
@@ -596,6 +606,11 @@
   }
   elAddLink.addEventListener('click',addLink);
   elLinkSearch.addEventListener('input',function(){linkFilter=this.value.trim().toLowerCase();renderLinks();});
+  document.getElementById('linkFilterSeg').addEventListener('click',function(e){
+    if(e.target.tagName!=='BUTTON')return;
+    this.querySelectorAll('button').forEach(function(b){b.classList.remove('active');});
+    e.target.classList.add('active'); linkStatus=e.target.dataset.v; renderLinks();
+  });
   elLinkUrl.addEventListener('keydown',function(e){if(e.key==='Enter')addLink();});
   elLinkName.addEventListener('keydown',function(e){if(e.key==='Enter')elLinkUrl.focus();});
 
