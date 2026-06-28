@@ -175,6 +175,16 @@
       <input id="linkSearch" class="linksearch" type="text" autocomplete="off" placeholder="🔍 ค้นหาลิงก์…">
       <div id="linkList"></div>
     </div>
+    <div class="card sidecard" style="margin-top:14px">
+      <h2>🎬 ลิงก์สื่อ</h2>
+      <div class="addlink">
+        <input id="mediaName" type="text" autocomplete="off" placeholder="ชื่อ (เช่น รูป/คลิป Vogue)">
+        <input id="mediaUrl" type="text" autocomplete="off" placeholder="วางลิงก์สื่อที่นี่…">
+        <button id="addMedia">+ เพิ่มสื่อ</button>
+      </div>
+      <input id="mediaSearch" class="linksearch" type="text" autocomplete="off" placeholder="🔍 ค้นหาสื่อ…">
+      <div id="mediaList"></div>
+    </div>
   </aside>
   <div class="wrap">
   <header>
@@ -588,6 +598,72 @@
   elLinkSearch.addEventListener('input',function(){linkFilter=this.value.trim().toLowerCase();renderLinks();});
   elLinkUrl.addEventListener('keydown',function(e){if(e.key==='Enter')addLink();});
   elLinkName.addEventListener('keydown',function(e){if(e.key==='Enter')elLinkUrl.focus();});
+
+  // ----- media links sidebar (shared via Firebase, fallback localStorage) -----
+  var MLS='knp_media_v1';
+  var media=[];
+  var mediaFilter='';
+  var MFB=null;
+  try{ if(window.firebase&&firebase.apps&&firebase.apps.length&&firebase.database) MFB=firebase.database().ref('media'); }catch(e){MFB=null;}
+  var elMediaName=document.getElementById('mediaName'),elMediaUrl=document.getElementById('mediaUrl'),elAddMedia=document.getElementById('addMedia'),elMediaList=document.getElementById('mediaList'),elMediaSearch=document.getElementById('mediaSearch');
+  function saveMediaLocal(){try{localStorage.setItem(MLS,JSON.stringify(media));}catch(e){}}
+  function renderMedia(){
+    elMediaList.innerHTML='';
+    if(!media.length){var e=document.createElement('div');e.className='linkempty';e.textContent='ยังไม่มีสื่อ — วางลิงก์สื่อแล้วกดเพิ่ม';elMediaList.appendChild(e);return;}
+    var view=media.map(function(L,i){return {L:L,i:i};});
+    if(mediaFilter)view=view.filter(function(o){return ((o.L.name||'')+' '+(o.L.url||'')).toLowerCase().indexOf(mediaFilter)!==-1;});
+    if(!view.length){var e2=document.createElement('div');e2.className='linkempty';e2.textContent='ไม่พบสื่อที่ค้นหา';elMediaList.appendChild(e2);return;}
+    view.forEach(function(o){
+      var L=o.L,i=o.i;
+      var row=document.createElement('div');row.className='linkitem'+(L.done?' done':'');
+      var chk=document.createElement('button');chk.className='chk';chk.title='ทำเครื่องหมายว่าใช้แล้ว';chk.textContent=L.done?'✅':'⬜';
+      chk.onclick=function(){toggleMedia(L,i);};
+      var a=document.createElement('a');a.href=normUrl(L.url);a.target='_blank';a.rel='noopener noreferrer';a.textContent=L.name||L.url;
+      var ed=document.createElement('button');ed.className='edit';ed.title='แก้ไขชื่อ';ed.textContent='✏️';
+      ed.onclick=function(){editMedia(L,i);};
+      var del=document.createElement('button');del.className='del';del.title='ลบ';del.textContent='✕';
+      del.onclick=function(){delMedia(L,i);};
+      row.appendChild(chk);row.appendChild(a);row.appendChild(ed);row.appendChild(del);elMediaList.appendChild(row);
+    });
+  }
+  function addMediaLink(){
+    var url=normUrl(elMediaUrl.value);
+    if(!url){elMediaUrl.focus();return;}
+    var name=(elMediaName.value||'').trim();
+    if(MFB){MFB.push({name:name,url:url,done:false,ts:Date.now()});}
+    else{media.unshift({name:name,url:url,done:false,ts:Date.now()});saveMediaLocal();renderMedia();}
+    elMediaName.value='';elMediaUrl.value='';elMediaUrl.focus();
+  }
+  function toggleMedia(L,i){
+    if(MFB&&L.key){MFB.child(L.key).update({done:!L.done});}
+    else{media[i].done=!media[i].done;saveMediaLocal();renderMedia();}
+  }
+  function delMedia(L,i){
+    if(MFB&&L.key){MFB.child(L.key).remove();}
+    else{media.splice(i,1);saveMediaLocal();renderMedia();}
+  }
+  function editMedia(L,i){
+    var nn=prompt('แก้ไขชื่อสื่อ:',L.name||'');
+    if(nn===null)return;
+    nn=nn.trim();
+    if(MFB&&L.key){MFB.child(L.key).update({name:nn});}
+    else{media[i].name=nn;saveMediaLocal();renderMedia();}
+  }
+  if(MFB){
+    MFB.on('value',function(snap){
+      var v=snap.val()||{};
+      media=Object.keys(v).map(function(k){var o=v[k]||{};return {key:k,name:o.name||'',url:o.url||'',done:!!o.done,ts:o.ts||0};});
+      media.sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+      renderMedia();
+    });
+  }else{
+    try{var rm=localStorage.getItem(MLS);if(rm)media=JSON.parse(rm)||[];}catch(e){}
+    renderMedia();
+  }
+  elAddMedia.addEventListener('click',addMediaLink);
+  elMediaSearch.addEventListener('input',function(){mediaFilter=this.value.trim().toLowerCase();renderMedia();});
+  elMediaUrl.addEventListener('keydown',function(e){if(e.key==='Enter')addMediaLink();});
+  elMediaName.addEventListener('keydown',function(e){if(e.key==='Enter')elMediaUrl.focus();});
 
   // ----- decorative flourishes -----
   var stTotal=document.getElementById('stTotal'),stCamp=document.getElementById('stCamp'),stCopied=document.getElementById('stCopied');
