@@ -153,6 +153,12 @@
   .statitem .sr .ct{color:var(--rose-d);font-weight:800;white-space:nowrap}
   .statbar{height:6px;border-radius:999px;background:#efe6f3;overflow:hidden}
   .statbar>i{display:block;height:100%;background:linear-gradient(90deg,#ec84b0,#9a6fd0);border-radius:999px}
+  .cooldown{margin-top:14px}
+  .cool-txt{font-size:13px;color:var(--rose-d);font-weight:700;margin-bottom:5px}
+  .cool-bar{height:6px;border-radius:999px;background:#efe6f3;overflow:hidden}
+  .cool-bar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ec84b0,#9a6fd0);border-radius:999px;transition:width .12s linear}
+  .cooldown.done .cool-txt{color:var(--ok)}
+  .cooldown.done .cool-bar>i{background:var(--ok)}
 </style>
 </head>
 <body>
@@ -215,6 +221,15 @@
       </div>
       <button class="resetbtn" id="resetUsed">ล้างประวัติ (<span id="usedCount">0</span>)</button>
     </div>
+    <div class="ctl-row">
+      <label class="lbl">กันสแปม</label>
+      <div class="seg" id="coolSeg">
+        <button data-v="0">ปิด</button>
+        <button data-v="5">5 วิ</button>
+        <button data-v="8" class="active">8 วิ</button>
+        <button data-v="10">10 วิ</button>
+      </div>
+    </div>
     <div class="pool" id="pool"></div>
     <div class="prog"><i id="progBar"></i></div>
   </div>
@@ -227,6 +242,10 @@
     <div class="actions">
       <button class="btn primary" id="copyBtn" disabled>📋 คัดลอก <span class="kbd">(C)</span></button>
       <button class="btn" id="copyNextBtn" disabled>คัดลอก + สุ่มต่อ</button>
+    </div>
+    <div class="cooldown" id="cooldown" hidden>
+      <div class="cool-txt" id="coolTxt"></div>
+      <div class="cool-bar"><i id="coolBar"></i></div>
     </div>
   </div>
 
@@ -433,7 +452,7 @@
     if(!used.has(current.t)){ used.add(current.t); saveUsed(); }
     markSeen(current);
     updateBadges();
-    updatePoolLine(); updateUsedCount(); updateStats(); celebrate(); recordCopy(current.__c);
+    updatePoolLine(); updateUsedCount(); updateStats(); celebrate(); recordCopy(current.__c); startCooldown();
   }
 
   // ----- campaign combobox -----
@@ -635,6 +654,32 @@
       renderStats();
     });
   }else{ loadStatLocal(); renderStats(); }
+
+  // ----- anti-spam cooldown timer -----
+  var coolSec=8, coolTimer=null;
+  var elCooldown=document.getElementById('cooldown'),elCoolTxt=document.getElementById('coolTxt'),elCoolBar=document.getElementById('coolBar');
+  try{var cv=localStorage.getItem('knp_cool_v1'); if(cv!==null) coolSec=parseInt(cv,10)||0;}catch(e){}
+  function startCooldown(){
+    if(coolTimer){clearInterval(coolTimer);coolTimer=null;}
+    if(!coolSec){elCooldown.hidden=true;return;}
+    var total=coolSec*1000, end=Date.now()+total;
+    elCooldown.hidden=false; elCooldown.classList.remove('done');
+    function tick(){
+      var left=end-Date.now();
+      if(left<=0){elCoolBar.style.width='100%';elCoolTxt.textContent='✓ พร้อมคอมต่อไปได้เลย';elCooldown.classList.add('done');clearInterval(coolTimer);coolTimer=null;return;}
+      elCoolBar.style.width=Math.round((1-left/total)*100)+'%';
+      elCoolTxt.textContent='⏱️ เว้นจังหวะกันสแปม — รออีก '+Math.ceil(left/1000)+' วิ';
+    }
+    tick(); coolTimer=setInterval(tick,100);
+  }
+  document.getElementById('coolSeg').addEventListener('click',function(e){
+    if(e.target.tagName!=='BUTTON')return;
+    this.querySelectorAll('button').forEach(function(b){b.classList.remove('active');});
+    e.target.classList.add('active'); coolSec=parseInt(e.target.dataset.v,10)||0;
+    try{localStorage.setItem('knp_cool_v1',String(coolSec));}catch(e2){}
+    if(!coolSec){if(coolTimer){clearInterval(coolTimer);coolTimer=null;}elCooldown.hidden=true;}
+  });
+  (function(){var bs=document.getElementById('coolSeg').querySelectorAll('button');for(var i=0;i<bs.length;i++){bs[i].classList.toggle('active', parseInt(bs[i].dataset.v,10)===coolSec);}})();
 
   // ----- init -----
   elCampInput.value=labelOf(campSel);
